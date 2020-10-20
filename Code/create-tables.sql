@@ -9,7 +9,7 @@ drop table if exists privileged;
 drop table if exists users;
 
 PRAGMA foreign_keys = ON;
--- Create table statements
+
 create table users (
   uid		char(4),
   name		text,
