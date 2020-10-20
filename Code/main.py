@@ -37,10 +37,12 @@ def register(conn, db):
         print("User already exists")
         time.sleep(1)
 
+    # obtain user info
     password = getpass("Enter new password (no blankspace):").strip()
     city = input("Enter your city: ")
-    crdate = datetime.date(datetime.now())
+    crdate = datetime.date(datetime.now()) # crdate = current date
 
+    # find last uid
     maxuid = db.execute("SELECT MAX(uid) FROM users").fetchall()
     uidintstr = maxuid[0][0][1:]
     if uidintstr == "999":
@@ -52,7 +54,6 @@ def register(conn, db):
 
     db.execute("INSERT INTO users VALUES (?,?,?,?,?)", (newuid, newName, password, city, crdate))
     conn.commit()
-    print(db.execute("select * from users").fetchall())
     print("User {0} created!".format(newName))
 
     return SystemFunctions.session(conn, db, newuid)
