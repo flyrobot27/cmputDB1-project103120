@@ -9,33 +9,21 @@ except ImportError as args:
     print("Error:", args)
     exit(1)
 
-def return_yes_no(userInput):
-    ''' 
-    Check yes/no input. If yes, return 1. If no, return 0. If undentified, return 2
-    '''
-
-    if userInput in ['N', 'n', "no", "No", "NO"]:
-        return 0
-    elif userInput in ['y', 'Y', "Yes", "yes", "YES"]:
-        return 1
-    else:
-        return 2
-
 
 def register(conn, db):
     ''' 
     Creating new users. Return False if user want to quit the program, True if otherwise.
     '''
-
-    while True:
-        newName = input("Create user name: ").strip()
-        result = db.execute("SELECT users.uid FROM users WHERE users.name = ?", (newName,)).fetchall()
-        if result == []:
-            print("Username Okay")
-            break
+    newName = input("Create user name: ").strip()
+    result = db.execute("SELECT users.uid FROM users WHERE users.name = ?", (newName,)).fetchall()
+    if result == []:
+        print()
+        print("Username Okay")
+    else:
         print()
         print("User already exists")
         time.sleep(1)
+        return True
 
     # obtain user info
     password = getpass("Enter new password (no blankspace):").strip()
@@ -64,37 +52,25 @@ def login(conn, db):
     ''' 
     Existing users login. Return False if user want to quit the program, True if otherwise. 
     '''
+    
+    userName = input("Enter user name: ").strip() # get username. Remove spaces
+    password = getpass("Enter password: ").strip() # get password
+    result = db.execute("SELECT users.uid FROM users WHERE name = ?", (userName,)).fetchall()
 
-    while True:
-        userName = input("Enter user name: ").strip() # get username. Remove spaces
-        password = getpass("Enter password: ").strip() # get password
-        result = db.execute("SELECT users.uid FROM users WHERE name = ?", (userName,)).fetchall()
+    if result != []:    # non empty return, username is in database
+        var = (userName, password)
+        result = db.execute("SELECT users.uid FROM users WHERE name = ? AND pwd = ?", var).fetchall()
 
-        if result != []:    # non empty return, username is in database
-            var = (userName, password)
-            result = db.execute("SELECT users.uid FROM users WHERE name = ? AND pwd = ?", var).fetchall()
-
-            if result == []: # indicating the password and username does not match
-                print("Username or password is incorrect.")
-                time.sleep(1)
-                while True:
-                    retry = input("Retry? (y/n): ").strip()
-                    if not return_yes_no(retry):
-                        return True
-                    elif return_yes_no(retry) == 1:
-                        break
-            else:
-                uid = result[0]
-                break
-        else:
-            print("User does not exist.")
+        if result == []: # indicating the password and username does not match
+            print("Username or password is incorrect.")
             time.sleep(1)
-            while True:
-                retry = input("Create user? (y/n)") 
-                if return_yes_no(retry) == 1: # if user want to create a new user
-                    return register(conn, db) 
-                elif return_yes_no(retry) == 0:
-                    return True
+            return True
+        else:
+            uid = result[0]
+    else:
+        print("User does not exist.")
+        time.sleep(1)
+        return True
 
     print("login successful")
 
