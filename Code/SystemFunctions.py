@@ -76,6 +76,13 @@ def search_post(conn, db, uid):
     search a post in the database. Return the matching posts 
     '''
     #TODO
+    keywords = []
+    while not keywords:
+        print("Please enter a keyword(s) to search ")
+        keywords = input()
+        time.sleep(0.5)
+    
+
 
 def post_question(conn, db, uid):
     ''' 
