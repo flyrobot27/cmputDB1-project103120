@@ -81,9 +81,8 @@ def search_post(conn, db, uid):
         print("Please enter a keyword(s) to search ")
         keywords = input()
         time.sleep(0.5)
+    tbt = db.execute("SELECT * FROM posts p left join tags t using (pid) WHERE lower(p.title) like ? or lower(t.tag) like ? or lower(t.tag) like ?",('%'+keywords+'%','%'+keywords+'%','%'+keywords+'%')).fetchall()
     
-
-
 def post_question(conn, db, uid):
     ''' 
     post a question to the database 
