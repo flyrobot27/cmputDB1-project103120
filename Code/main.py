@@ -1,4 +1,5 @@
 try:
+    import sys
     import os.path
     import sqlite3
     from getpass import getpass
@@ -95,10 +96,12 @@ def main():
     # connect to the database
     try:
         # obtain DB file path
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        db_path = os.path.join(BASE_DIR, "p1.db")
+        if len(sys.argv) != 2 or sys.argv[1] in ("help", "--help", "-h"):
+            print("Usage: python3 main.py [.db file]")
+            exit(0)
+        db_path = sys.argv[1]
 
-        # check if p1.db exists
+        # check if db exists
         if not os.path.isfile(db_path): 
             raise IOError("Failed to locate database")
 
