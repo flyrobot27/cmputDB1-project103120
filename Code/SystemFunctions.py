@@ -137,9 +137,10 @@ def choose_actions(conn, db, uid, result):
     print("Displaying Result ({0}-{1})/{2}".format(str(displayStart + 1), displayEnd, resultLength))
     print()
 
-    actions = [".h",".answer",".vote",".markacc",".givebdg",".tag",".edit",".next",".prev",".quit",".view"]
-    userInput = input("[{0}] (.h for help)> ".format(uid))
+    actions = [".h",".answer",".vote",".next",".prev",".quit",".view"]
+    privAct = [".markacc",".givebdg",".tag",".edit"]
 
+    userInput = input("[{0}] (.h for help)> ".format(uid))
     while userInput.strip() not in [".q", ".quit"]:
         try:
             #Extract command
@@ -153,14 +154,59 @@ def choose_actions(conn, db, uid, result):
             print("Error: {0}: invalid command...".format(userInput))
         else:
             if cmd == ".h":
-                print("Usage:")
-                print("\tAnswer a question: .answer [pid]")
-                print("\tAnswer a question: .answer [pid]")
+                print("Avaliable Actions:")
+                print("\tView post:          .view [PID]")
+                print("\tView next page:     .next")
+                print("\tView previous page: .prev")
+                print("\tAnswer a question:  .answer [PID]")
+                print("\tVote a post:        .vote [PID]")
+                print("\tQuit:               .q / .quit")
+                if IS_PRIVILEGED:
+                    print("Special actions:")
+                    print("\tMark as the accepted:   .markacc [PID]")
+                    print("\tGive badge to poster:   .givebdg [PID]")
+                    print("\tAdd a tag:              .tag [PID] [tag name]")
+                    print("\tEdit post:              .edit [PID]")
+
             elif cmd == ".prev":
-                pass
+                if (displayStart - 5) < 0:
+                    print("Error: This is the first page.")
+                else:
+                    displayStart -= 5
+                    displayEnd = displayStart + 5
+                    if displayEnd >= resultLength:
+                        displayEnd = resultLength
+                    display_result(columnNames, result[displayStart:displayEnd])
+                    print("Displaying Result ({0}-{1})/{2}".format(str(displayStart + 1), displayEnd, resultLength))
+                    print()
+
             elif cmd == ".next":
+                if (displayStart + 5) >= resultLength:
+                    print("Error: This is the last page.")
+                else:
+                    displayStart += 5
+                    displayEnd = displayStart + 5
+                    if displayEnd >= resultLength:
+                        displayEnd = resultLength
+                    display_result(columnNames, result[displayStart:displayEnd])
+                    print("Displaying Result ({0}-{1})/{2}".format(str(displayStart + 1), displayEnd, resultLength))
+                    print()
+
+            elif cmd == ".answer":
                 pass
 
+            elif cmd == ".vote":
+                pass
+
+            elif IS_PRIVILEGED:
+                if cmd == ".markacc":
+                    pass
+                elif cmd == ".givebdg":
+                    pass
+                elif cmd == ".tag":
+                    pass
+                elif cmd == ".edit":
+                    pass
         finally:
             userInput = input("[{0}] (.h for help)> ".format(uid))
 
@@ -188,7 +234,7 @@ def search_post(conn, db, uid):
             posts.*,
             IFNULL(COUNT(DISTINCT votes.vno), 0) vcnt,
             CASE
-                WHEN posts.pid = answer.qid THEN
+                WHEN posts.pid = answers.qid THEN
                     COUNT(DISTINCT answers.pid)
                 ELSE
                     "N/A"
