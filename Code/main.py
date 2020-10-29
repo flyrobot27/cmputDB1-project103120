@@ -14,19 +14,34 @@ def register(conn, db):
     ''' 
     Creating new users.
     '''
-    newName = input("Create user name: ").strip()
-    result = db.execute("SELECT users.uid FROM users WHERE UPPER(users.name) = UPPER(?)", (newName,)).fetchall()
+    newID = input("Create user ID: ").strip()
+    result = db.execute("SELECT users.uid FROM users WHERE UPPER(users.uid) = UPPER(?)", (newID,)).fetchall()
     if result == []:
         print()
-        print("Username Okay")
+        print("UserID Okay")
     else:
         print()
-        print("User already exists")
+        print("User ID already exists. Please choose a different UID.")
         time.sleep(1)
         return 
 
     # obtain user info
-    password = getpass("Enter new password (no blankspace):").strip()
+    while True:
+        password = getpass("Enter new password (no blankspace): ").strip()
+        confirm_password = getpass("Confirm your password: ").strip()
+        if password != confirm_password:
+            print("Password does not match")
+            print()
+            time.sleep(0.5)
+        else:
+            break
+
+    while True:
+        newName = input("Enter your name: ")
+        if newName.strip() == '':
+            print("Name cannot be empty!")
+        else:
+            break
 
     while True:
         city = input("Enter your city: ")
@@ -37,25 +52,11 @@ def register(conn, db):
 
     crdate = datetime.date(datetime.now()) # crdate = current date
 
-    # find last uid
-    maxuid = db.execute("SELECT MAX(uid) FROM users").fetchall()
-    if maxuid[0][0] != None:
-        uidintstr = maxuid[0][0][1:]
-        if uidintstr == "999":
-            print("No more users can be created.")
-            return 
-
-        uidint = int(uidintstr) + 1
-        newuid = "u" + str(uidint).zfill(len(uidintstr))
-
-    else:
-        newuid = "u000"
-
-    db.execute("INSERT INTO users VALUES (?,?,?,?,?)", (newuid, newName, password, city, crdate))
+    db.execute("INSERT INTO users VALUES (?,?,?,?,?)", (newID, newName, password, city, crdate))
     conn.commit()
-    print("User {0} created!".format(newName))
+    print("User {0} created!".format(newID))
 
-    return SystemFunctions.session(conn, db, newuid)
+    return SystemFunctions.session(conn, db, newID)
 
 
 def login(conn, db):
@@ -63,13 +64,13 @@ def login(conn, db):
     Existing users login.
     '''
 
-    userName = input("Enter user name: ").strip() # get username. Remove spaces
+    userID = input("Enter user id (uid): ").strip() # get UID. Remove spaces
     password = getpass("Enter password: ").strip() # get password
-    result = db.execute("SELECT users.uid FROM users WHERE UPPER(name) = UPPER(?)", (userName,)).fetchall()
+    result = db.execute("SELECT users.uid FROM users WHERE UPPER(uid) = UPPER(?)", (userID,)).fetchall()
 
     if result != []:    # non empty return, username is in database
-        var = (userName, password)
-        result = db.execute("SELECT users.uid FROM users WHERE UPPER(name) = UPPER(?) AND pwd = ?", var).fetchall()
+        var = (userID, password)
+        result = db.execute("SELECT users.uid FROM users WHERE UPPER(uid) = UPPER(?) AND pwd = ?", var).fetchall()
 
         if result == []: # indicating the password and username does not match
             print("Username or password is incorrect.")
@@ -99,7 +100,7 @@ def main():
 
         # check if p1.db exists
         if not os.path.isfile(db_path): 
-            raise IOError
+            raise IOError("Failed to locate database")
 
     except IOError as args:
         print("Error: ", args)
