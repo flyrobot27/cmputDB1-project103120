@@ -65,26 +65,97 @@ def editor(pretitle="", prebody=""):
 
     return title, body
 
-def search_display():
-    '''
-    A display for search result
-    '''
+def choose_action(result):
     pass
 
 def search_post(conn, db, uid):
     ''' 
     search a post in the database. Return the matching posts 
     '''
-    #TODO
-    keywords = []
-    while not keywords:
-        print("Please enter a keyword(s) to search ")
-        words = input()
-        keywords = words.split()
-        time.sleep(0.5)
-    for word in keywords:
-        tbt = db.execute("SELECT * FROM posts p left join tags t using (pid) WHERE lower(p.title) like ? or lower(t.tag) like ? or lower(t.tag) like ?",('%'+str(word)+'%','%'+str(word)+'%','%'+str(word)+'%')).fetchall()
+    print("Please enter keyword(s) to search. Press Enter to finish.")
+    words = input().lower()  # lower the case of all keywords as the search is case insensitive
+    keywords = tuple(words.split())
+    time.sleep(0.5)
+    if len(keywords) == 0:
+        # If no keyword is supplied, return all posts, sort by newest
+        result = db.execute("""
+        SELECT 
+            CASE
+                WHEN posts.pid = answers.qid THEN
+                    "Q"
+                ELSE
+                    "A"
+                END checkqa,
+            posts.*,
+            IFNULL(COUNT(DISTINCT votes.vno), 0) vcnt,
+            CASE
+                WHEN posts.pid = answers.pid THEN
+                    "N/A"
+                ELSE
+                    COUNT(DISTINCT answers.pid)
+                END countanswers
+            FROM posts LEFT JOIN answers ON posts.pid = answers.qid
+            LEFT JOIN votes ON votes.pid = posts.pid
+            GROUP BY posts.pid
+            ORDER BY posts.pdate DESC
+        """).fetchall()
+    else:
+        # search for supplied keyword
+        query = """
+        SELECT 
+            CASE
+                WHEN posts.pid = answers.qid THEN
+                    "Q"
+                ELSE
+                    "A"
+                END checkqa,
+            posts.*,
+            IFNULL(COUNT(DISTINCT votes.vno), 0) vcnt,
+            CASE
+                WHEN posts.pid = answers.pid THEN
+                    "N/A"
+                ELSE
+                    COUNT(DISTINCT answers.pid)
+                END countanswers
+            FROM posts LEFT JOIN answers ON posts.pid = answers.qid
+            LEFT JOIN votes ON votes.pid = posts.pid
+            LEFT JOIN tags ON tags.pid = posts.pid
+            GROUP BY posts.pid
+            HAVING ((posts.title LIKE ?) OR (posts.body LIKE ?) OR (tags.tag LIKE ?))
+        """
+        # insert query statement for all matchings
+        for i in range(len(keywords) - 1):
+            query += "OR ((posts.title LIKE ?) OR (posts.body LIKE ?) OR (tags.tag LIKE ?)) \n"
         
+        # append the keywords into input tuple
+        queryInputs = []
+        for k in keywords:
+            kString = "%" + k + "%"
+            for i in range(3):
+                queryInputs.append(kString)
+        
+        # Order by the number of their apperance, counting only once per keyword
+        # since the LIKE keyword will return 1 if match or 0 if not, adding them together return no. of keyword matched
+
+        query += "ORDER BY ((posts.title LIKE ?) OR (posts.body LIKE ?) OR (tags.tag LIKE ?)) \n"
+        for i in range(len(keywords) - 1):
+            query += " + ((posts.title LIKE ?) OR (posts.body LIKE ?) OR (tags.tag LIKE ?)) \n"
+        query += "DESC \n"
+
+        # append the keywords into input tuple
+        for k in keywords:
+            kString = "%" + k + "%"
+            for i in range(3):
+                queryInputs.append(kString)
+                
+        queryInputs = tuple(queryInputs)
+        result = db.execute(query, queryInputs).fetchall()
+
+    for item in result:
+        # item format:
+        # (Ptype, pid, pdate, title, body, poster, vcnt, acnt)
+        print(item)
+
 def post_question(conn, db, uid):
     ''' 
     post a question to the database 
@@ -135,7 +206,7 @@ def post_question(conn, db, uid):
 def session(conn, db, uid):
     ''' User session entrance '''
     print("*-----------------------*")
-    print("Welcome back!")
+    print("Welcome back, {0}!".format(uid))
     while True:
         print("Select an action:")
         print("1. Post a question.")
@@ -171,3 +242,4 @@ if __name__ == "__main__":
     newtitle, newbody = editor(title, body)
     print(newtitle)
     print(newbody)
+    
