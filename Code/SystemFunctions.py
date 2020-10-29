@@ -1,71 +1,13 @@
-import sqlite3
-import time
-from datetime import datetime
-import curses
-import curses.textpad
+try:
+    import sqlite3
+    import time
+    from datetime import datetime
+    import PostActions
+except ImportError as args:
+    print("Import Error:",args)
+    exit(1)
 
-def editor(pretitle="", prebody=""):
-    '''
-    A simple editor for posting questions or answers. Returns the title and body of the post
-    It can also edit post given the title and body of the post wanted to be modified
-    '''
-
-    # initialize command line text editor with curses
-    stdscr = curses.initscr()
-    curses.noecho()      # displaying keys only when required
-    curses.cbreak()      # no Enter key required
-    stdscr.keypad(True)  # enable special keys
-
-    begin_x = 0         # starting x coordinate
-    begin_y = 0         # starting y coordinate
-    rows, cols = stdscr.getmaxyx()   # get display dimention of the console
-
-    win = curses.newwin(rows, cols, begin_y, begin_x)   # create window
-    win.addstr(begin_y, begin_x, "Type your post here. Press Ctrl + G to switch and exit.")
-    win.addstr(begin_y + 1, begin_x, "Title:")
-    win.addstr(begin_y + 3, begin_x, "Body:")
-    win.refresh()
-
-    # initialize subwindow
-    titlewin = win.subwin(1, cols ,begin_y + 2, begin_x)
-    titlewin.addstr(0, 0, pretitle) # if a previous post title is supplied load the previous post
-
-    bodywin = win.subwin(rows - 7, cols ,begin_y + 4, begin_x)
-    bodywin.addstr(0, 0, prebody) # load previous post body
-
-    # refresh previous text
-    bodywin.refresh()
-    titlewin.refresh()
-
-    replywin = win.subwin(1, 5, rows - 2, begin_x + 22)
-    redisplay = win.subwin(1, 22, rows - 2, begin_x)
-
-    while True:
-        title = curses.textpad.Textbox(titlewin).edit()
-        body = curses.textpad.Textbox(bodywin).edit()
-
-        redisplay.addstr(0, 0, "Exit and save? (y/N) ")
-        redisplay.refresh()
-
-        reply = curses.textpad.Textbox(replywin, insert_mode=True).edit(lambda x: 7 if x == 10 else x)  # convert Ctrl+G to Enter
-
-        if reply.strip() in ['y', 'Y', "yes", "Yes", "YES"]:
-            break
-        else:  # return to edit post
-            redisplay.clear()
-            redisplay.refresh()
-            replywin.clear()
-            replywin.refresh()
-
-    # restore configuration
-    curses.nocbreak()
-    stdscr.keypad(False)
-    curses.echo()
-    curses.endwin()
-
-    return title, body
-
-def display_result(columnNames, result):
+def display_result(columnNames, result, displayStart, resultLength):
     '''
     Display results in a command line table
     columnNames and results will be tuple of strings or integer
@@ -78,7 +20,11 @@ def display_result(columnNames, result):
 
     Returns: None
     '''
-    displayResult = [list(r) for r in result]
+    displayEnd = displayStart + 5  # at most 5 results per page
+    if displayEnd >= resultLength: # prevent integer overflow
+        displayEnd = resultLength
+
+    displayResult = [list(r) for r in result[displayStart:displayEnd]]
     # Format result to ensure they do not exceed specific length
     for text in displayResult:
         # remove newline and tab
@@ -105,6 +51,9 @@ def display_result(columnNames, result):
     for text in displayResult:
         print("{0:<10}  {1:<5}  {2:<10}  {3:<30}  {4:<50}  {5:<10}  {6:<6}  {7:<9}".format(*text))
     print('='*145)
+    print("Displaying Result ({0}-{1})/{2}".format(str(displayStart + 1), displayEnd, resultLength))
+    print()
+    return
 
 def choose_actions(conn, db, uid, result):
     '''
@@ -127,17 +76,11 @@ def choose_actions(conn, db, uid, result):
     # item format:
     columnNames = ("PostType","PID","Date","Title","Body","Poster","Votes","ansCount")
     resultLength = len(result)
-    displayStart = 0
-    if resultLength >= 5:
-        displayEnd = 5
-    else:
-        displayEnd = resultLength
-    
-    display_result(columnNames, result[displayStart:displayEnd])
-    print("Displaying Result ({0}-{1})/{2}".format(str(displayStart + 1), displayEnd, resultLength))
-    print()
 
-    actions = [".h",".answer",".vote",".next",".prev",".quit",".view"]
+    displayStart = 0   
+    display_result(columnNames, result, displayStart, resultLength)
+
+    actions = [".h",".answer",".vote",".next",".prev",".quit",".view",".show"]
     privAct = [".markacc",".givebdg",".tag",".edit"]
 
     userInput = input("[{0}] (.h for help)> ".format(uid))
@@ -146,15 +89,28 @@ def choose_actions(conn, db, uid, result):
             #Extract command
             cmd = userInput.split()[0].strip()
 
+            # check command
+            if cmd not in actions:
+                if IS_PRIVILEGED and (cmd not in privAct):
+                    raise SyntaxError
+                else:
+                    raise SyntaxError
+
             # only certain command will have second argv
-            if cmd not in [".h", ".next", ".prev"]:
+            if cmd not in [".h", ".next", ".prev", ".q", ".quit",".show"]:
                 userPID = userInput.split()[1].strip()
+                if cmd == ".tag": # user need to specify tag
+                    tagName = ' '.join(userInput.split()[2:])
+                    print(tagName)
 
         except IndexError:
-            print("Error: {0}: invalid command...".format(userInput))
+            print("Error: {0}: missing arguments...".format(userInput))
+        except SyntaxError:
+            print("Error {0}: Invalid command...".format(userInput))
         else:
             if cmd == ".h":
                 print("Avaliable Actions:")
+                print("\tShow current page:  .show")
                 print("\tView post:          .view [PID]")
                 print("\tView next page:     .next")
                 print("\tView previous page: .prev")
@@ -167,33 +123,28 @@ def choose_actions(conn, db, uid, result):
                     print("\tGive badge to poster:   .givebdg [PID]")
                     print("\tAdd a tag:              .tag [PID] [tag name]")
                     print("\tEdit post:              .edit [PID]")
+                    
+            elif cmd ==".show":
+                display_result(columnNames, result, displayStart, resultLength)
 
-            elif cmd == ".prev":
-                if (displayStart - 5) < 0:
+            elif cmd == ".prev": # view previous page
+                if (displayStart - 5) < 0: # i.e. already on most previous result
                     print("Error: This is the first page.")
                 else:
                     displayStart -= 5
-                    displayEnd = displayStart + 5
-                    if displayEnd >= resultLength:
-                        displayEnd = resultLength
-                    display_result(columnNames, result[displayStart:displayEnd])
-                    print("Displaying Result ({0}-{1})/{2}".format(str(displayStart + 1), displayEnd, resultLength))
-                    print()
+                    display_result(columnNames, result, displayStart, resultLength)
+                    
 
             elif cmd == ".next":
                 if (displayStart + 5) >= resultLength:
                     print("Error: This is the last page.")
                 else:
                     displayStart += 5
-                    displayEnd = displayStart + 5
-                    if displayEnd >= resultLength:
-                        displayEnd = resultLength
-                    display_result(columnNames, result[displayStart:displayEnd])
-                    print("Displaying Result ({0}-{1})/{2}".format(str(displayStart + 1), displayEnd, resultLength))
-                    print()
+                    display_result(columnNames, result, displayStart, resultLength)
 
             elif cmd == ".answer":
-                pass
+                pid = userPID
+                PostActions.answer(conn, db, uid, pid)
 
             elif cmd == ".vote":
                 pass
@@ -226,7 +177,7 @@ def search_post(conn, db, uid):
         result = db.execute("""
         SELECT 
             CASE
-                WHEN posts.pid = answers.qid THEN
+                WHEN posts.pid = questions.pid THEN
                     "Question"
                 ELSE
                     "Answer"
@@ -234,13 +185,14 @@ def search_post(conn, db, uid):
             posts.*,
             IFNULL(COUNT(DISTINCT votes.vno), 0) vcnt,
             CASE
-                WHEN posts.pid = answers.qid THEN
+                WHEN posts.pid = questions.pid THEN
                     COUNT(DISTINCT answers.pid)
                 ELSE
                     "N/A"
                 END countanswers
             FROM posts LEFT JOIN answers ON posts.pid = answers.qid
             LEFT JOIN votes ON votes.pid = posts.pid
+            LEFT JOIN questions ON questions.pid = posts.pid
             GROUP BY posts.pid
             ORDER BY posts.pdate DESC
         """).fetchall()
@@ -249,7 +201,7 @@ def search_post(conn, db, uid):
         query = """
         SELECT 
             CASE
-                WHEN posts.pid = answers.qid THEN
+                WHEN posts.pid = questions.pid THEN
                     "Question"
                 ELSE
                     "Answer"
@@ -257,12 +209,13 @@ def search_post(conn, db, uid):
             posts.*,
             IFNULL(COUNT(DISTINCT votes.vno), 0) vcnt,
             CASE
-                WHEN posts.pid = answers.qid THEN
+                WHEN posts.pid = questions.pid THEN
                     COUNT(DISTINCT answers.pid)
                 ELSE
                     "N/A"
                 END countanswers
             FROM posts LEFT JOIN answers ON posts.pid = answers.qid
+            LEFT JOIN questions ON questions.pid = posts.pid
             LEFT JOIN votes ON votes.pid = posts.pid
             LEFT JOIN tags ON tags.pid = posts.pid
             GROUP BY posts.pid
@@ -302,7 +255,7 @@ def post_question(conn, db, uid):
     ''' 
     post a question to the database 
     '''
-    title, body = editor()
+    title, body = PostActions.editor()
     print("*-----------------------*")
     print("Please review your post:")
     print("Title:", title)
@@ -381,7 +334,7 @@ if __name__ == "__main__":
     redunant sentences and words in this string, or you may call it, text. Again, these are just fillers, they dont really mean anything.
     It is also unnecessarily verbose such that I can test what if the post body is more than a single line
     '''
-    newtitle, newbody = editor(title, body)
+    newtitle, newbody = PostActions.editor(title, body)
     print(newtitle)
     print(newbody)
     
