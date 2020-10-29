@@ -65,8 +65,32 @@ def editor(pretitle="", prebody=""):
 
     return title, body
 
-def choose_action(result):
-    pass
+def display_result(columnNames, results):
+    '''
+    Display results in a command line table
+    columnNames and results will be tuple of strings or integer
+    Example: columnNames = ("A","B","C"), results = (("1","2","3"),("4","5","6"))
+    Output:
+     A    B    C
+    ---  ---  ---
+     1    2    3
+     4    5    6
+
+    Returns: None
+    '''
+    #TODO
+
+def choose_actions(conn, db, uid):
+    '''
+    Performs actions after searching for post:
+    Post action-Answer
+    Post action-Vote
+    For privileged users:
+    Post action-Mark as the accepted
+    Post action-Give a badge
+    Post action-Add a tag
+    Post Action-Edit'''
+    #TODO
 
 def search_post(conn, db, uid):
     ''' 
@@ -147,14 +171,16 @@ def search_post(conn, db, uid):
             kString = "%" + k + "%"
             for i in range(3):
                 queryInputs.append(kString)
-                
+
         queryInputs = tuple(queryInputs)
         result = db.execute(query, queryInputs).fetchall()
 
-    for item in result:
-        # item format:
-        # (Ptype, pid, pdate, title, body, poster, vcnt, acnt)
-        print(item)
+
+    # item format:
+    columnNames = ("PostType","PID","Date","Title","Body","Poster","Votes","ansCount")
+    display_result(columnNames, result)
+    
+    return choose_actions(conn, db, uid)
 
 def post_question(conn, db, uid):
     ''' 
