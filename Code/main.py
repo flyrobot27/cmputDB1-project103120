@@ -7,7 +7,7 @@ try:
     import time
     import SystemFunctions
 except ImportError as args:
-    print("Error:", args)
+    print("Import Error:", args)
     exit(1)
 
 
