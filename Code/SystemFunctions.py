@@ -65,7 +65,7 @@ def editor(pretitle="", prebody=""):
 
     return title, body
 
-def display_result(columnNames, results):
+def display_result(columnNames, result):
     '''
     Display results in a command line table
     columnNames and results will be tuple of strings or integer
@@ -78,26 +78,101 @@ def display_result(columnNames, results):
 
     Returns: None
     '''
-    #TODO
+    displayResult = [list(r) for r in result]
+    # Format result to ensure they do not exceed specific length
+    for text in displayResult:
+        # remove newline and tab
+        for i in range(len(text)):
+            text[i] = str(text[i]).replace('\n','')
+            text[i] = str(text[i]).replace('\t',' ')
 
-def choose_actions(conn, db, uid):
+        # length check
+        if len(text[3]) > 30:
+            text[3] = text[3][:27]
+            text[3] += "..."
+
+        if len(text[4]) > 50:
+            text[4] = text[4][:47]
+            text[4] += "..."
+        
+        if len(text[5]) > 10:
+            text[5] = text[5][:7]
+            text[5] += "..."
+    print()
+    print('='*145)
+    print("{0:<10}  {1:<5}  {2:<10}  {3:<30}  {4:<50}  {5:<10}  {6:<6}  {7:<9}".format(*columnNames))
+    print("-"*10+"  "+"-"*5+"  "+"-"*10+"  "+"-"*30 + "  "+ "-"*50+ "  "+"-"*10+"  "+"-"*6+"  "+"-"*9) 
+    for text in displayResult:
+        print("{0:<10}  {1:<5}  {2:<10}  {3:<30}  {4:<50}  {5:<10}  {6:<6}  {7:<9}".format(*text))
+    print('='*145)
+
+def choose_actions(conn, db, uid, result):
     '''
     Performs actions after searching for post:
     Post action-Answer
     Post action-Vote
+
     For privileged users:
     Post action-Mark as the accepted
     Post action-Give a badge
     Post action-Add a tag
-    Post Action-Edit'''
-    #TODO
+    Post Action-Edit
+    '''
+    
+    IS_PRIVILEGED = False
+    findprivilege = db.execute("SELECT uid FROM privileged WHERE uid = ?", (uid,)).fetchall()
+    if findprivilege != []:
+        IS_PRIVILEGED = True
+
+    # item format:
+    columnNames = ("PostType","PID","Date","Title","Body","Poster","Votes","ansCount")
+    resultLength = len(result)
+    displayStart = 0
+    if resultLength >= 5:
+        displayEnd = 5
+    else:
+        displayEnd = resultLength
+    
+    display_result(columnNames, result[displayStart:displayEnd])
+    print("Displaying Result ({0}-{1})/{2}".format(str(displayStart + 1), displayEnd, resultLength))
+    print()
+
+    actions = [".h",".answer",".vote",".markacc",".givebdg",".tag",".edit",".next",".prev",".quit",".view"]
+    userInput = input("[{0}] (.h for help)> ".format(uid))
+
+    while userInput.strip() not in [".q", ".quit"]:
+        try:
+            #Extract command
+            cmd = userInput.split()[0].strip()
+
+            # only certain command will have second argv
+            if cmd not in [".h", ".next", ".prev"]:
+                userPID = userInput.split()[1].strip()
+
+        except IndexError:
+            print("Error: {0}: invalid command...".format(userInput))
+        else:
+            if cmd == ".h":
+                print("Usage:")
+                print("\tAnswer a question: .answer [pid]")
+                print("\tAnswer a question: .answer [pid]")
+            elif cmd == ".prev":
+                pass
+            elif cmd == ".next":
+                pass
+
+        finally:
+            userInput = input("[{0}] (.h for help)> ".format(uid))
+
+    print("*-----------------------*")
+    return
 
 def search_post(conn, db, uid):
     ''' 
     search a post in the database. Return the matching posts 
     '''
     print("Please enter keyword(s) to search. Press Enter to finish.")
-    words = input().lower()  # lower the case of all keywords as the search is case insensitive
+    words = input(">>> ").lower()  # lower the case of all keywords as the search is case insensitive
     keywords = tuple(words.split())
     time.sleep(0.5)
     if len(keywords) == 0:
@@ -106,17 +181,17 @@ def search_post(conn, db, uid):
         SELECT 
             CASE
                 WHEN posts.pid = answers.qid THEN
-                    "Q"
+                    "Question"
                 ELSE
-                    "A"
+                    "Answer"
                 END checkqa,
             posts.*,
             IFNULL(COUNT(DISTINCT votes.vno), 0) vcnt,
             CASE
-                WHEN posts.pid = answers.pid THEN
-                    "N/A"
-                ELSE
+                WHEN posts.pid = answer.qid THEN
                     COUNT(DISTINCT answers.pid)
+                ELSE
+                    "N/A"
                 END countanswers
             FROM posts LEFT JOIN answers ON posts.pid = answers.qid
             LEFT JOIN votes ON votes.pid = posts.pid
@@ -129,17 +204,17 @@ def search_post(conn, db, uid):
         SELECT 
             CASE
                 WHEN posts.pid = answers.qid THEN
-                    "Q"
+                    "Question"
                 ELSE
-                    "A"
+                    "Answer"
                 END checkqa,
             posts.*,
             IFNULL(COUNT(DISTINCT votes.vno), 0) vcnt,
             CASE
-                WHEN posts.pid = answers.pid THEN
-                    "N/A"
-                ELSE
+                WHEN posts.pid = answers.qid THEN
                     COUNT(DISTINCT answers.pid)
+                ELSE
+                    "N/A"
                 END countanswers
             FROM posts LEFT JOIN answers ON posts.pid = answers.qid
             LEFT JOIN votes ON votes.pid = posts.pid
@@ -175,12 +250,7 @@ def search_post(conn, db, uid):
         queryInputs = tuple(queryInputs)
         result = db.execute(query, queryInputs).fetchall()
 
-
-    # item format:
-    columnNames = ("PostType","PID","Date","Title","Body","Poster","Votes","ansCount")
-    display_result(columnNames, result)
-    
-    return choose_actions(conn, db, uid)
+    return choose_actions(conn, db, uid, result)
 
 def post_question(conn, db, uid):
     ''' 
