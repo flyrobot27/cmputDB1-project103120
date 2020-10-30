@@ -65,36 +65,57 @@ def editor(pretitle="", prebody=""):
 
     return title, body
 
-def _parse(text):
+def _print_text(title, body):
     '''
-    NOT WORKING
-    A parse function to ensure the total text display will not exceed 70 characters
+    A simple function to print the title and body
     '''
-    accu = 0
-    i = 0
-    titleLength = len(text)
-    while i < titleLength:
-        if text[i] != '\n': #If there is a newline we reset the accumulator
-            accu += 1
-            if accu > 62:
-                char = text[accu]
-                if char.stip() == "": # If the character we want to shift to newline is empty
-                    text = text[:i] + '\n' + (" "*6) + text[i + 1:]
-                else: # find the previous space
-                    found = False
-                    prei = i
-                    while i > 0 and not found:
-                        i -= 1
-                        if char.stip() == "":
-                            text = text[:i] + '\n'+ (" "*6) + text[i + 1:]
-                            found = True
-                    if not found: # edge case when title word is longer than 62
-                        text = text[:prei - 1] + '-\n'+ (" "*6) + text[prei + 1:]
 
+    def _parse(text):
+        '''
+        Parse the given text to the length 90
+        '''
+
+        newtext = list(text)
         accu = 0
-        i += 1
-    return text
+        i = 0
+        while i < len(text):
+            if newtext[i] == '\n':
+                accu = 0
+                i += 1
+            else:
+                if accu > 88:
+                    if newtext[i] == " ":
+                        newtext.insert(i+1, '\n')
+                    elif newtext[i - 1] == " ":
+                        newtext.insert(i, '\n')
+                    else:
+                        newtext.insert(i, "-\n")
 
+                    accu = 0
+                else:
+                    accu += 1
+                
+                i += 1
+
+        return ''.join(newtext)
+
+    print("-" * 90)
+    if len(title) < 83:
+        print("Title:",title)
+    else:
+        newtitle = _parse(title)
+        print("Title:")
+        print(newtitle)
+
+    print("- " * 45)
+
+    if len(body) < 83:
+        print(body)
+    else:
+        newbody = _parse(body)
+        print()
+        print(newbody)
+    
 def view(conn, db, uid, pid):
     '''
     detailed view of a post
@@ -105,13 +126,12 @@ def view(conn, db, uid, pid):
         return
     post = post[0]
 
-    answers = None
+    answers = list()
     checkQues = db.execute("SELECT pid FROM questions WHERE questions.pid = ?",(pid,)).fetchall() # check if it is a question
     IS_QUESTION = False
     if checkQues != [] and checkQues[0][0] == pid:
         IS_QUESTION = True
         answerpids = db.execute("SELECT answers.pid FROM answers WHERE answers.qid = ?",(pid,)).fetchall() # Get answers pid
-        answers = list()
         for apid in answerpids:
             apid = apid[0] # results are in tuples, need to extract the result out
             text = db.execute("SELECT posts.* FROM posts WHERE posts.pid = ?",(apid,)).fetchall() # get content of answer
@@ -123,34 +143,40 @@ def view(conn, db, uid, pid):
     poster = post[4]
 
     print()
-    print("=" * 70)
     if IS_QUESTION:
-        print("Poster:u/{0:<15} {1:<25} {2:<10}".format(poster,"Question", postdate))
+        print("Viewing Question {0}".format(pid))
+        print("=" * 90)
+        print("Poster:u/{0:<25} {1:^20} {2:>28}".format(poster,"Question", postdate))
+        _print_text(title, body)
+        i = 1
+        print("= " * 45)
+        print()
+        for ans in answers:
+            print("Answer {0}/{1}:".format(i,len(answers)))
+            Adate = ans[1]
+            Atitle = ans[2]
+            Abody = ans[3]
+            Aposter = ans[4]
+            print("Poster:u/{0:<25} {1:^20} {2:>28}".format(Aposter,"", Adate))
+            _print_text(Atitle, Abody)
+            print("=" * 90)
+            i += 1
+        print()
+
     else:
+        print("Viewing Answer {0}".format(pid))
+        print("=" * 90)
         Qpid = db.execute("SELECT qid FROM answers WHERE answers.pid = ?",(pid, )).fetchall()[0][0] # return the pid of the Question
-        print("Poster:u/{0:<15} Parent post:{1:<15} {2:<10}".format(poster,Qpid, postdate))
-
-    
-
-    print("-" * 70)
-    if len(title) < 63:
-        print("HERE")
-        print("Title:",title)
-    else:
-        newtitle = _parse(title)
-        print("Title:",newtitle)
-
-    print()
-
-    if len(body) < 63:
-        print("HERE")
-        print("Body: ",body)
-    else:
-        newbody = _parse(body)
-        print("Body: ",newbody)
-
-    print("=" * 70)
-    print()
+        print("Poster:u/{0:<25} Parent post:{1:<20} {2:>20}".format(poster,Qpid, postdate))
+        _print_text(title, body)
+        print()
+        # get the parent post (Question)
+        result = db.execute("SELECT posts.title, posts.body, posts.pdate, posts.poster FROM posts WHERE posts.pid = ?",(Qpid,)).fetchall()[0]
+        print("= "*45)
+        print("Parent post:{0} Poster:u/{1} {2:>10}".format(Qpid, result[3], result[2]))
+        _print_text(result[0], result[1])
+        print("="*90)
+        print()
 
     return
 
