@@ -86,7 +86,7 @@ def choose_actions(conn, db, uid, result, keywords):
         try:
             #Extract command
             if userInput.strip() != '':
-                cmd = userInput.split()[0].strip()
+                cmd = userInput.split()[0].strip().lower()
                 # check command
                 if cmd not in actions:
                     if IS_PRIVILEGED and (cmd not in privAct):
@@ -96,7 +96,7 @@ def choose_actions(conn, db, uid, result, keywords):
 
                 # only certain command will have second argv
                 if cmd not in [".h", ".next", ".prev", ".q", ".quit",".show"]:
-                    userPID = userInput.split()[1].strip()
+                    userPID = userInput.split()[1].strip().lower()
 
                     if cmd == ".tag": # user need to specify tag
                         tagName = ' '.join(userInput.split()[2:])
@@ -115,12 +115,12 @@ def choose_actions(conn, db, uid, result, keywords):
                 print("\tView previous page: .prev")
                 print("\tAnswer a question:  .answer [PID]")
                 print("\tVote a post:        .vote [PID]")
-                print("\tQuit:               .q / .quit")
+                print("\tQuit this search:   .q / .quit")
                 if IS_PRIVILEGED:
                     print()
                     print("Special actions:")
                     print("\tMark as accepted Ans:   .markacc [PID]")
-                    print("\tGive badge to poster:   .givebdg [PID] [badge name]")
+                    print("\tGive badge to poster:   .givebdg [PID]")
                     print("\tAdd a tag:              .tag [PID] [tag name]")
                     print("\tEdit post:              .edit [PID]")
 
@@ -157,15 +157,15 @@ def choose_actions(conn, db, uid, result, keywords):
             elif IS_PRIVILEGED:
                 if cmd == ".markacc":
                     PostActions.markacc(conn, db, userPID)
-
                 elif cmd == ".givebdg":
-                    pass
+                    PostActions.givebdg(conn, db, userPID)
                 elif cmd == ".tag":
-                    pass
+                    PostActions.tag(conn, db, userPID, tagName)
                 elif cmd == ".edit":
-                    pass
-        finally:
-            userInput = input("[u/{0}]{1} ".format(uid, CMD_CHAR))
+                    PostActions.edit_post(conn, db, userPID)
+                    
+        # finally
+        userInput = input("[u/{0}]{1} ".format(uid, CMD_CHAR))
 
     print("*-----------------------*")
     return

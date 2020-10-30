@@ -21,7 +21,7 @@ def editor(pretitle="", prebody=""):
     rows, cols = stdscr.getmaxyx()   # get display dimention of the console
 
     win = curses.newwin(rows, cols, begin_y, begin_x)   # create window
-    win.addstr(begin_y, begin_x, "Type your post here. Press Ctrl + G to switch and exit.")
+    win.addstr(begin_y, begin_x, "Edit your post here. Press Ctrl + G to switch and exit.")
     win.addstr(begin_y + 1, begin_x, "Title:")
     win.addstr(begin_y + 3, begin_x, "Body:")
     win.refresh()
@@ -42,6 +42,7 @@ def editor(pretitle="", prebody=""):
 
     while True:
         title = curses.textpad.Textbox(titlewin).edit()
+        bodywin.refresh() # refresh to update cursor location
         body = curses.textpad.Textbox(bodywin).edit()
 
         redisplay.addstr(0, 0, "Exit and save? (y/N) ")
@@ -120,6 +121,7 @@ def view(conn, db, uid, pid):
     '''
     detailed view of a post
     '''
+
     post = db.execute("SELECT posts.* FROM posts WHERE posts.pid = ?",(pid,)).fetchall() # extract post
     if post == []:
         print("Error: post with pid[{0}] does not exist".format(pid))
@@ -198,6 +200,7 @@ def answer(conn, db, uid, quespid):
     '''
     Answer a Question
     '''
+
     checkReturn = db.execute("SELECT pid FROM questions WHERE questions.pid = ?",(quespid,)).fetchall()
     if checkReturn == []:
         print("Error: Selected post is not a Question.")
@@ -255,6 +258,7 @@ def vote(conn, db, uid, pid):
     '''
     Upvote the given post. Return if user already voted
     '''
+
     # check if user has already upvoted
     check = db.execute("SELECT votes.vdate FROM votes WHERE votes.pid = ? AND votes.uid = ?",(pid, uid)).fetchall()
     if check != []:
@@ -275,7 +279,9 @@ def vote(conn, db, uid, pid):
 def markacc(conn, db, Apid):
     '''
     Mark the answer as the accepted answer to to the assosiated question
+    For privileged users only
     '''
+
     Qpid = db.execute("SELECT answers.qid FROM answers WHERE answers.pid = ?",(Apid,)).fetchall()
     if Qpid == []:
         print("Error: {0} is not an answer to a question".format(Apid))
@@ -295,3 +301,116 @@ def markacc(conn, db, Apid):
     db.execute("UPDATE questions SET theaid = ? WHERE pid = ?",(Apid, Qpid))
     conn.commit()
     print("Accepted answer for {0} updated to {1}".format(Qpid, Apid))
+    return
+
+def givebdg(conn, db, pid):
+    '''
+    Give a badge to the poster of the post. For privileged users only
+    '''
+
+    poster = db.execute("SELECT poster FROM posts WHERE posts.pid = ?",(pid,)).fetchall()
+    if poster == []:
+        print("Error: post with PID[{0}] does not exist".format(pid))
+        return
+    else:
+        poster = poster[0][0]
+
+    bdate = datetime.date(datetime.now()) # get current date
+
+    # check if user already received badges today
+    check = db.execute("SELECT * FROM ubadges WHERE uid = ? AND bdate = ?",(poster, bdate)).fetchall()
+    if check != []:
+        print("Error: User u/{0} has already received a badge today.".format(poster))
+        return
+
+    results = db.execute("SELECT bname, type FROM badges").fetchall()
+    btypes = set([bt[1] for bt in results])
+    print("Avaliable badges:")
+    for types in btypes:
+        print("{0} badges:".format(types))
+        for badges in results:
+            if badges[1] == types:
+                print("\t",badges[0])
+        print()
+
+    userInput = input("Which badge do you want to give to u/{0}? >>> ".format(poster)).lower().lstrip().rstrip() # lower the input and strip leading/trailing spaces
+    avaliablebdg = [bt[0].lstrip().rstrip() for bt in results]
+
+    if userInput not in avaliablebdg:
+        print("Error: invalid badge name")
+        return
+
+    bname = userInput
+    uid = poster
+    db.execute("INSERT INTO ubadges VALUES(?,?,?)",(uid,bdate,bname))
+    conn.commit()
+
+    print("Successfully given [{0}] to u/{1}.".format(bname, uid))
+    print()
+    return
+
+def tag(conn, db, pid, tagName):
+    '''
+    Tag a post. For privileged users only.
+    '''
+
+    check = db.execute("SELECT posts.pid FROM posts WHERE posts.pid = ?",(pid,)).fetchall()
+    if check == []:
+        print("Error: post with PID[{0}] does not exist".format(pid))
+        return
+
+    def _insertTag(conn, db, pid, tagName):
+        ''' insert tag function '''
+        db.execute("INSERT INTO tags VALUES(?,?)",(pid,tagName))
+        conn.commit()
+        print("Successfully tagged post [{0}] with tag [{1}].".format(pid, tagName))
+        return
+
+    # Get if post has any tag
+    existingTags = db.execute("SELECT tags.tag FROM tags WHERE tags.pid = ?",(pid,)).fetchall()
+    if not existingTags:
+        _insertTag(conn, db, pid, tagName)
+        return
+    else:
+        # check if tag is already added
+        check = db.execute("SELECT tags.tag FROM tags WHERE tags.pid = ? AND tags.tag LIKE ?",(pid, "%"+tagName+"%")).fetchall()
+        if not check:
+            _insertTag(conn, db, pid, tagName)
+        else:
+            print("Error: tag [{0}] already added for post [{1}]".format(tagName, pid))
+            return
+
+def edit_post(conn, db, pid):
+    '''
+    Edit a given post. For privileged users only
+    '''
+    # fetch the post
+    post = db.execute("SELECT posts.title, posts.body FROM posts WHERE posts.pid = ?",(pid,)).fetchall()
+    if post == []:
+        print("Error: post [{0}] does not exist.".format(pid))
+        return
+    
+    # extract post title and body
+    pretitle = post[0][0]
+    prebody = post[0][1]
+    # call the editor
+    newtitle, newbody = editor(pretitle, prebody)
+
+    # Preview post after edit
+    print()
+    print("Preview of edited post [{0}]:".format(pid))
+    print("=" * 90)
+    _print_text(newtitle, newbody)
+    print("=" * 90)
+    print()
+
+    # Confirm edit
+    userInput = input("Confirm edit? (y/N) ")
+    if userInput.strip() not in ['y', 'Y', "yes", "Yes", "YES"]:
+        print("User discarded edit.")
+        return
+    
+    db.execute("UPDATE posts SET title = ?, body = ? WHERE pid = ?",(newtitle, newbody, pid))
+    conn.commit()
+    print("Successfully edited post [{0}].".format(pid))
+    return
