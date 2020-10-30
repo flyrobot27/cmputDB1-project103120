@@ -55,7 +55,7 @@ def display_result(columnNames, result, displayStart, resultLength):
     print()
     return
 
-def choose_actions(conn, db, uid, result):
+def choose_actions(conn, db, uid, result, keywords):
     '''
     Performs actions after searching for post:
     Post action-Answer
@@ -116,7 +116,7 @@ def choose_actions(conn, db, uid, result):
         else:
             if cmd == ".h":
                 print("Avaliable Actions:")
-                print("\tShow current page:  .show")
+                print("\tRefresh page:       .show")
                 print("\tView post:          .view [PID]")
                 print("\tView next page:     .next")
                 print("\tView previous page: .prev")
@@ -131,7 +131,8 @@ def choose_actions(conn, db, uid, result):
                     print("\tEdit post:              .edit [PID]")
 
             elif cmd ==".show":
-                # Reshow the result table. unfortunately it does not refresh
+                # Refresh the result table
+                result = search_post(conn, db, uid, keywords)
                 display_result(columnNames, result, displayStart, resultLength)
 
             elif cmd == ".view":
@@ -153,11 +154,10 @@ def choose_actions(conn, db, uid, result):
                     display_result(columnNames, result, displayStart, resultLength)
 
             elif cmd == ".answer":
-                pid = userPID
-                PostActions.answer(conn, db, uid, pid)
+                PostActions.answer(conn, db, uid, userPID)
 
             elif cmd == ".vote":
-                pass
+                PostActions.vote(conn, db, uid, userPID)
 
             elif IS_PRIVILEGED:
                 if cmd == ".markacc":
@@ -174,14 +174,10 @@ def choose_actions(conn, db, uid, result):
     print("*-----------------------*")
     return
 
-def search_post(conn, db, uid):
+def search_post(conn, db, uid, keywords):
     ''' 
     search a post in the database. Return the matching posts 
     '''
-    print("Please enter keyword(s) to search. Press Enter to search.")
-    words = input(">>> ").lower()  # lower the case of all keywords as the search is case insensitive
-    keywords = tuple(words.split())
-    time.sleep(0.5)
     if len(keywords) == 0:
         # If no keyword is supplied, return all posts, sort by newest
         result = db.execute("""
@@ -259,7 +255,7 @@ def search_post(conn, db, uid):
         queryInputs = tuple(queryInputs)
         result = db.execute(query, queryInputs).fetchall()
 
-    return choose_actions(conn, db, uid, result)
+    return result
 
 def post_question(conn, db, uid):
     ''' 
@@ -339,7 +335,12 @@ def session(conn, db, uid):
             post_question(conn, db, uid)
 
         elif userInput == 2:
-            search_post(conn, db, uid)
+            print("Please enter keyword(s) to search. Press Enter to search.")
+            words = input(">>> ").lower()  # lower the case of all keywords as the search is case insensitive
+            keywords = tuple(words.split())
+            time.sleep(0.5)
+            result = search_post(conn, db, uid, keywords)
+            choose_actions(conn, db, uid, result, keywords)
 
         elif userInput == 3:
             time.sleep(0.5)
