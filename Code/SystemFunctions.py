@@ -127,6 +127,7 @@ def choose_actions(conn, db, uid, result, keywords):
             elif cmd ==".show":
                 # Refresh the result table
                 result = search_post(conn, db, uid, keywords)
+                resultLength = len(result)
                 display_result(columnNames, result, displayStart, resultLength)
 
             elif cmd == ".view":
