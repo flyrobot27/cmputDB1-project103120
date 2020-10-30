@@ -144,21 +144,33 @@ def view(conn, db, uid, pid):
 
     print()
     if IS_QUESTION:
+        # Check for theaid
+        try:
+            theaid = db.execute("SELECT questions.theaid FROM questions WHERE questions.pid = ?",(pid,)).fetchall()[0][0]
+        except IndexError:
+            theaid = None
+
         print("Viewing Question {0}".format(pid))
         print("=" * 90)
         print("Poster:u/{0:<25} {1:^20} {2:>28}".format(poster,"Question", postdate))
         _print_text(title, body)
         i = 1
-        print("= " * 45)
+        print("=" * 90)
         print()
         # Print the answers
+        if len(answers) == 0:
+            print("(No answers)")
+
         for ans in answers:
+            Apid = ans[0]
+            if Apid == theaid:
+                print("{0:^90}".format("*** Accepted Answer ***"))
             print("Answer {0}/{1}:".format(i,len(answers)))
             Adate = ans[1]
             Atitle = ans[2]
             Abody = ans[3]
             Aposter = ans[4]
-            print("Poster:u/{0:<25} {1:^20} {2:>28}".format(Aposter,"", Adate))
+            print("Poster:u/{0:<25} AnswerPID:{1:<15} {2:>24}".format(Aposter,Apid, Adate))
             _print_text(Atitle, Abody)
             print("=" * 90)
             i += 1
@@ -174,7 +186,8 @@ def view(conn, db, uid, pid):
         # get the parent post (Question)
         result = db.execute("SELECT posts.title, posts.body, posts.pdate, posts.poster FROM posts WHERE posts.pid = ?",(Qpid,)).fetchall()[0]
         print("= "*45)
-        print("Parent post:{0} Poster:u/{1} {2:>10}".format(Qpid, result[3], result[2]))
+        print()
+        print("Viewing Parent post:{0:<20} Poster:u/{1:<10} {2:>27}".format(Qpid, result[3], result[2]))
         _print_text(result[0], result[1])
         print("="*90)
         print()
@@ -257,4 +270,28 @@ def vote(conn, db, uid, pid):
         db.execute("INSERT INTO votes VALUES(?,?,?,?)",(pid,vno,vdate,uid))
         conn.commit()
     else:
-        raise ValueError("Internal Database Error: vno not isdigit()")
+        raise ValueError("Internal Database Error: vno type is not int")
+
+def markacc(conn, db, Apid):
+    '''
+    Mark the answer as the accepted answer to to the assosiated question
+    '''
+    Qpid = db.execute("SELECT answers.qid FROM answers WHERE answers.pid = ?",(Apid,)).fetchall()
+    if Qpid == []:
+        print("Error: {0} is not an answer to a question".format(Apid))
+        return
+    
+    Qpid = Qpid[0][0]
+
+    # check if there already is an accepted answer
+    check = db.execute("SELECT IFNULL(questions.theaid, 0) FROM questions WHERE questions.pid = ?",(Qpid,)).fetchall()
+    if check != [] and check[0][0] != 0:
+        theaid = check[0][0]
+        userInput = input("There is already an accepted answer {0}. Do you want to change it to {1}? (y/N)".format(theaid, Apid))
+        if userInput.strip() not in ['y', 'Y', "yes", "Yes", "YES"]:
+            print("User rejected change. Accepted answer is {0}".format(theaid))
+            return
+    
+    db.execute("UPDATE questions SET theaid = ? WHERE pid = ?",(Apid, Qpid))
+    conn.commit()
+    print("Accepted answer for {0} updated to {1}".format(Qpid, Apid))

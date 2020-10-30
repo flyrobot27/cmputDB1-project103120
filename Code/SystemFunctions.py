@@ -11,14 +11,7 @@ def display_result(columnNames, result, displayStart, resultLength):
     '''
     Display results in a command line table
     columnNames and results will be tuple of strings or integer
-    Example: columnNames = ("A","B","C"), results = (("1","2","3"),("4","5","6"))
-    Output:
-     A    B    C
-    ---  ---  ---
-     1    2    3
-     4    5    6
-
-    Returns: None
+    It will only display at most 5 results
     '''
     displayEnd = displayStart + 5  # at most 5 results per page
     if displayEnd >= resultLength: # prevent integer overflow
@@ -92,23 +85,23 @@ def choose_actions(conn, db, uid, result, keywords):
     while userInput.strip() not in [".q", ".quit"]:
         try:
             #Extract command
-            cmd = userInput.split()[0].strip()
+            if userInput.strip() != '':
+                cmd = userInput.split()[0].strip()
+                # check command
+                if cmd not in actions:
+                    if IS_PRIVILEGED and (cmd not in privAct):
+                        raise SyntaxError
+                    elif not IS_PRIVILEGED:
+                        raise SyntaxError
 
-            # check command
-            if cmd not in actions:
-                if IS_PRIVILEGED and (cmd not in privAct):
-                    raise SyntaxError
-                elif not IS_PRIVILEGED:
-                    raise SyntaxError
+                # only certain command will have second argv
+                if cmd not in [".h", ".next", ".prev", ".q", ".quit",".show"]:
+                    userPID = userInput.split()[1].strip()
 
-            # only certain command will have second argv
-            if cmd not in [".h", ".next", ".prev", ".q", ".quit",".show"]:
-                userPID = userInput.split()[1].strip()
-
-                if cmd == ".tag": # user need to specify tag
-                    tagName = ' '.join(userInput.split()[2:])
-                    print(tagName)
-
+                    if cmd == ".tag": # user need to specify tag
+                        tagName = ' '.join(userInput.split()[2:])
+            else:
+                cmd = None
         except IndexError:
             print("Error: {0}: missing arguments...".format(userInput))
         except SyntaxError:
@@ -124,9 +117,10 @@ def choose_actions(conn, db, uid, result, keywords):
                 print("\tVote a post:        .vote [PID]")
                 print("\tQuit:               .q / .quit")
                 if IS_PRIVILEGED:
+                    print()
                     print("Special actions:")
-                    print("\tMark as the accepted:   .markacc [PID]")
-                    print("\tGive badge to poster:   .givebdg [PID]")
+                    print("\tMark as accepted Ans:   .markacc [PID]")
+                    print("\tGive badge to poster:   .givebdg [PID] [badge name]")
                     print("\tAdd a tag:              .tag [PID] [tag name]")
                     print("\tEdit post:              .edit [PID]")
 
@@ -161,7 +155,8 @@ def choose_actions(conn, db, uid, result, keywords):
 
             elif IS_PRIVILEGED:
                 if cmd == ".markacc":
-                    pass
+                    PostActions.markacc(conn, db, userPID)
+
                 elif cmd == ".givebdg":
                     pass
                 elif cmd == ".tag":
@@ -345,15 +340,3 @@ def session(conn, db, uid):
         elif userInput == 3:
             time.sleep(0.5)
             return
-
-if __name__ == "__main__":
-    title = "Test title"
-    body = ''' 
-    This is a really long body. The purpose of this long body is too test that if the editor is functioning properly. There are a lot of 
-    redunant sentences and words in this string, or you may call it, text. Again, these are just fillers, they dont really mean anything.
-    It is also unnecessarily verbose such that I can test what if the post body is more than a single line
-    '''
-    newtitle, newbody = PostActions.editor(title, body)
-    print(newtitle)
-    print(newbody)
-    
