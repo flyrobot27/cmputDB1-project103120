@@ -69,9 +69,11 @@ def choose_actions(conn, db, uid, result):
     '''
     
     IS_PRIVILEGED = False
+    CMD_CHAR = '$'
     findprivilege = db.execute("SELECT uid FROM privileged WHERE uid = ?", (uid,)).fetchall()
     if findprivilege != []:
         IS_PRIVILEGED = True
+        CMD_CHAR = '#'
 
     # item format:
     columnNames = ("PostType","PID","Date","Title","Body","Poster","Votes","ansCount")
@@ -80,10 +82,13 @@ def choose_actions(conn, db, uid, result):
     displayStart = 0   
     display_result(columnNames, result, displayStart, resultLength)
 
+    # all users can have these actions
     actions = [".h",".answer",".vote",".next",".prev",".quit",".view",".show"]
+
+    # only privileged users can have these actions
     privAct = [".markacc",".givebdg",".tag",".edit"]
 
-    userInput = input("[{0}] (.h for help)> ".format(uid))
+    userInput = input("[u/{0} (.h for help)]{1} ".format(uid, CMD_CHAR))
     while userInput.strip() not in [".q", ".quit"]:
         try:
             #Extract command
@@ -93,12 +98,13 @@ def choose_actions(conn, db, uid, result):
             if cmd not in actions:
                 if IS_PRIVILEGED and (cmd not in privAct):
                     raise SyntaxError
-                else:
+                elif not IS_PRIVILEGED:
                     raise SyntaxError
 
             # only certain command will have second argv
             if cmd not in [".h", ".next", ".prev", ".q", ".quit",".show"]:
                 userPID = userInput.split()[1].strip()
+
                 if cmd == ".tag": # user need to specify tag
                     tagName = ' '.join(userInput.split()[2:])
                     print(tagName)
@@ -123,9 +129,13 @@ def choose_actions(conn, db, uid, result):
                     print("\tGive badge to poster:   .givebdg [PID]")
                     print("\tAdd a tag:              .tag [PID] [tag name]")
                     print("\tEdit post:              .edit [PID]")
-                    
+
             elif cmd ==".show":
+                # Reshow the result table. unfortunately it does not refresh
                 display_result(columnNames, result, displayStart, resultLength)
+
+            elif cmd == ".view":
+                PostActions.view(conn, db, uid, userPID)
 
             elif cmd == ".prev": # view previous page
                 if (displayStart - 5) < 0: # i.e. already on most previous result
@@ -159,7 +169,7 @@ def choose_actions(conn, db, uid, result):
                 elif cmd == ".edit":
                     pass
         finally:
-            userInput = input("[{0}] (.h for help)> ".format(uid))
+            userInput = input("[u/{0}]{1} ".format(uid, CMD_CHAR))
 
     print("*-----------------------*")
     return
@@ -168,7 +178,7 @@ def search_post(conn, db, uid):
     ''' 
     search a post in the database. Return the matching posts 
     '''
-    print("Please enter keyword(s) to search. Press Enter to finish.")
+    print("Please enter keyword(s) to search. Press Enter to search.")
     words = input(">>> ").lower()  # lower the case of all keywords as the search is case insensitive
     keywords = tuple(words.split())
     time.sleep(0.5)
@@ -256,6 +266,14 @@ def post_question(conn, db, uid):
     post a question to the database 
     '''
     title, body = PostActions.editor()
+
+    if title.strip() == "" or body.strip() == "":
+        print()
+        print("Error: Title and/or body cannot be empty.")
+        print()
+        time.sleep(1)
+        return
+
     print("*-----------------------*")
     print("Please review your post:")
     print("Title:", title)
@@ -273,7 +291,7 @@ def post_question(conn, db, uid):
     if maxpid[0][0] != None:
         maxpidstr = maxpid[0][0][1:]
         if maxpidstr == "999":
-            print("Maximum posts reached. No more posts can be made.")
+            print("Error: Maximum posts reached. No more posts can be made.")
             return
         pidint = int(maxpidstr) + 1
         newpid = "p" + str(pidint).zfill(len(maxpidstr))

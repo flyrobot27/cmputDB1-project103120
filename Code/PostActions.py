@@ -65,11 +65,94 @@ def editor(pretitle="", prebody=""):
 
     return title, body
 
+def _parse(text):
+    '''
+    NOT WORKING
+    A parse function to ensure the total text display will not exceed 70 characters
+    '''
+    accu = 0
+    i = 0
+    titleLength = len(text)
+    while i < titleLength:
+        if text[i] != '\n': #If there is a newline we reset the accumulator
+            accu += 1
+            if accu > 62:
+                char = text[accu]
+                if char.stip() == "": # If the character we want to shift to newline is empty
+                    text = text[:i] + '\n' + (" "*6) + text[i + 1:]
+                else: # find the previous space
+                    found = False
+                    prei = i
+                    while i > 0 and not found:
+                        i -= 1
+                        if char.stip() == "":
+                            text = text[:i] + '\n'+ (" "*6) + text[i + 1:]
+                            found = True
+                    if not found: # edge case when title word is longer than 62
+                        text = text[:prei - 1] + '-\n'+ (" "*6) + text[prei + 1:]
+
+        accu = 0
+        i += 1
+    return text
+
 def view(conn, db, uid, pid):
     '''
     detailed view of a post
     '''
+    post = db.execute("SELECT posts.* FROM posts WHERE posts.pid = ?",(pid,)).fetchall() # extract post
+    if post == []:
+        print("Error: post with pid[{0}] does not exist".format(pid))
+        return
+    post = post[0]
 
+    answers = None
+    checkQues = db.execute("SELECT pid FROM questions WHERE questions.pid = ?",(pid,)).fetchall() # check if it is a question
+    IS_QUESTION = False
+    if checkQues != [] and checkQues[0][0] == pid:
+        IS_QUESTION = True
+        answerpids = db.execute("SELECT answers.pid FROM answers WHERE answers.qid = ?",(pid,)).fetchall() # Get answers pid
+        answers = list()
+        for apid in answerpids:
+            apid = apid[0] # results are in tuples, need to extract the result out
+            text = db.execute("SELECT posts.* FROM posts WHERE posts.pid = ?",(apid,)).fetchall() # get content of answer
+            answers.append(text[0]) # remove the outer list from the return. There should only be 1 return (pid are unique)
+
+    postdate = post[1]
+    title = post[2]
+    body = post[3]
+    poster = post[4]
+
+    print()
+    print("=" * 70)
+    if IS_QUESTION:
+        print("Poster:u/{0:<15} {1:<25} {2:<10}".format(poster,"Question", postdate))
+    else:
+        Qpid = db.execute("SELECT qid FROM answers WHERE answers.pid = ?",(pid, )).fetchall()[0][0] # return the pid of the Question
+        print("Poster:u/{0:<15} Parent post:{1:<15} {2:<10}".format(poster,Qpid, postdate))
+
+    
+
+    print("-" * 70)
+    if len(title) < 63:
+        print("HERE")
+        print("Title:",title)
+    else:
+        newtitle = _parse(title)
+        print("Title:",newtitle)
+
+    print()
+
+    if len(body) < 63:
+        print("HERE")
+        print("Body: ",body)
+    else:
+        newbody = _parse(body)
+        print("Body: ",newbody)
+
+    print("=" * 70)
+    print()
+
+    return
 
 def answer(conn, db, uid, quespid):
     '''
@@ -81,6 +164,9 @@ def answer(conn, db, uid, quespid):
         return
     
     title, body = editor()
+    if title.strip() == "" or body.strip() == "":
+        print("Error: Title and Body cannot be empty.")
+        return
 
     print()
     print("Please review your answer:")
@@ -99,7 +185,7 @@ def answer(conn, db, uid, quespid):
     if maxpid[0][0] != None:
         maxpidstr = maxpid[0][0][1:]
         if maxpidstr == "999":
-            print("Maximum posts reached. No more posts can be made.")
+            print("Error: Maximum posts reached. No more posts can be made.")
             return
         pidint = int(maxpidstr) + 1
         anspid = "p" + str(pidint).zfill(len(maxpidstr))
