@@ -151,6 +151,7 @@ def view(conn, db, uid, pid):
         i = 1
         print("= " * 45)
         print()
+        # Print the answers
         for ans in answers:
             print("Answer {0}/{1}:".format(i,len(answers)))
             Adate = ans[1]
@@ -236,3 +237,24 @@ def answer(conn, db, uid, quespid):
         time.sleep(0.5)
 
     return
+
+def vote(conn, db, uid, pid):
+    '''
+    Upvote the given post. Return if user already voted
+    '''
+    # check if user has already upvoted
+    check = db.execute("SELECT votes.vdate FROM votes WHERE votes.pid = ? AND votes.uid = ?",(pid, uid)).fetchall()
+    if check != []:
+        print("Error: You have already upvoted this post on {0}".format(check[0][0]))
+        return
+
+    vno = db.execute("SELECT IFNULL(COUNT(DISTINCT votes.vno),0) FROM votes WHERE votes.pid = ?", (pid,)).fetchall()[0][0]
+
+    vdate = datetime.date(datetime.now()) # get current date
+
+    if type(vno) == int:
+        vno = int(vno) + 1
+        db.execute("INSERT INTO votes VALUES(?,?,?,?)",(pid,vno,vdate,uid))
+        conn.commit()
+    else:
+        raise ValueError("Internal Database Error: vno not isdigit()")
