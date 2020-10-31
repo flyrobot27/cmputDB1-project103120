@@ -41,9 +41,9 @@ def editor(pretitle="", prebody=""):
     redisplay = win.subwin(1, 22, rows - 2, begin_x)
 
     while True:
-        title = curses.textpad.Textbox(titlewin).edit()
+        title = curses.textpad.Textbox(titlewin, insert_mode=True).edit()
         bodywin.refresh() # refresh to update cursor location
-        body = curses.textpad.Textbox(bodywin).edit()
+        body = curses.textpad.Textbox(bodywin, insert_mode=True).edit()
 
         redisplay.addstr(0, 0, "Exit and save? (y/N) ")
         redisplay.refresh()
