@@ -155,8 +155,7 @@ if __name__ == '__main__':
         print("User interrupted.")
         print("Bye")
         exit(0)
-    '''
     except Exception as args:
         print()
         print("Fatal Error:",args)
-        exit(1)'''
+        exit(1)
