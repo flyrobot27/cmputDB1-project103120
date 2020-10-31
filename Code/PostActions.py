@@ -19,12 +19,13 @@ def editor(pretitle="", prebody=""):
     begin_x = 0         # starting x coordinate
     begin_y = 0         # starting y coordinate
     # rows, cols = stdscr.getmaxyx()   # get display dimention of the console # This is causing issues with the lab machines
-    rows, cols = 90, 100
+    rows, cols = 15, 55
 
     win = curses.newwin(rows, cols, begin_y, begin_x)   # create window
     win.addstr(begin_y, begin_x, "Edit your post here. Press Ctrl + G to switch and exit.")
     win.addstr(begin_y + 1, begin_x, "Title:")
     win.addstr(begin_y + 3, begin_x, "Body:")
+    win.addstr(rows - 3, begin_x, "-" * cols)
     win.refresh()
 
     # initialize subwindow
