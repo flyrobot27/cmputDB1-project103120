@@ -13,6 +13,12 @@ def display_result(columnNames, result, displayStart, resultLength):
     columnNames and results will be tuple of strings or integer
     It will only display at most 5 results
     '''
+    if resultLength == 0:
+        print()
+        print("Empty Result, try a different keyword(s)")
+        print()
+        return
+
     displayEnd = displayStart + 5  # at most 5 results per page
     if displayEnd >= resultLength: # prevent integer overflow
         displayEnd = resultLength
