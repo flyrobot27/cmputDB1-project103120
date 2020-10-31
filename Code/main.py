@@ -1,5 +1,6 @@
 try:
     import sys
+    import os
     import os.path
     import sqlite3
     from getpass import getpass
@@ -158,4 +159,5 @@ if __name__ == '__main__':
     except Exception as args:
         print()
         print("Fatal Error:",args)
+        os.system("stty sane") # reset the shell
         exit(1)
