@@ -17,6 +17,20 @@ def register(conn, db):
     Creating new users.
     '''
     newID = input("Create user ID: ").strip()
+    confirmID = input("Confirm user ID: ").strip()
+    if newID == "":
+        print()
+        print("UserID cannot be empty!")
+        print()
+        time.sleep(0.5)
+        return
+    elif newID != confirmID:
+        print()
+        print("ID does not match!")
+        print()
+        time.sleep(0.5)
+        return
+
     result = db.execute("SELECT users.uid FROM users WHERE UPPER(users.uid) = UPPER(?)", (newID,)).fetchall()
     if result == []:
         print()
@@ -33,6 +47,10 @@ def register(conn, db):
         confirm_password = getpass("Confirm your password: ").strip()
         if password != confirm_password:
             print("Password does not match")
+            print()
+            time.sleep(0.5)
+        elif password == "":
+            print("Password cannot be empty!")
             print()
             time.sleep(0.5)
         else:
