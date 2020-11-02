@@ -31,10 +31,15 @@ def editor(pretitle="", prebody=""):
 
     # initialize subwindow
     titlewin = win.subwin(1, cols ,begin_y + 2, begin_x)
-    titlewin.addstr(0, 0, pretitle) # if a previous post title is supplied load the previous post
+    titlewin.addstr(0, 0, pretitle[:cols]) # if a previous post title is supplied load the previous post
 
     bodywin = win.subwin(rows - 7, cols ,begin_y + 4, begin_x)
-    bodywin.addstr(0, 0, prebody) # load previous post body
+    
+    bodytext = prebody.split('\n')
+    i = 0
+    for text in bodytext:
+        bodywin.addstr(i, 0, text[:cols]) # load previous post body. If the line is too long chop off
+        i += 1
 
     # refresh previous text
     bodywin.refresh()
