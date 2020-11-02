@@ -31,7 +31,7 @@ def editor(pretitle="", prebody=""):
 
     # initialize subwindow
     titlewin = win.subwin(1, cols ,begin_y + 2, begin_x)
-    titlewin.addstr(0, 0, pretitle[:cols]) # if a previous post title is supplied load the previous post
+    titlewin.addstr(0, 0, pretitle[:cols - 1]) # if a previous post title is supplied load the previous post
 
     bodywin = win.subwin(rows - 7, cols ,begin_y + 4, begin_x)
     
